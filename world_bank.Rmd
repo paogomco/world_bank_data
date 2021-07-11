@@ -1,0 +1,123 @@
+---
+title: "Exploring World Bank Data"
+author: "Paola Gomez"
+output: github_document
+---
+
+## Load necessary libraries
+
+```{r}
+library(tidyverse)
+library(dplyr)
+library(readr)
+
+```
+
+## Write a function to import the data files
+
+```{r}
+
+
+
+wbd <- function(x){
+  read_csv(x, skip = 3) %>%    # Remove columns 1,2,3 and 65 because they are weird.
+    select(-X65) %>%     
+    rename(country = "Country Name",    # Rename columns to handle data easier.
+           indicator = "Indicator Name",
+           indicator_code = "Indicator Code") %>%
+    pivot_longer(cols = c(-starts_with("country"), -starts_with("indicator")),    # Arrange years as observation (rows).
+                 names_to = "year",
+                 values_to = "value",
+                 names_ptypes = list(year = double())) %>%
+    select(-indicator) %>%
+    pivot_wider(names_from = indicator_code,    # Arrange indicators as variables (columns) 
+                values_from = value) %>%
+    filter(country == "Mexico") %>%
+    select(country:year, SP.DYN.TFRT.IN,
+           NY.GDP.PCAP.CD,
+           SP.DYN.LE00.IN,
+           SP.DYN.IMRT.IN) %>%
+    rename(fertility_rate="SP.DYN.TFRT.IN",
+           gdp_percapita="NY.GDP.PCAP.CD",
+           life_expectancy="SP.DYN.LE00.IN",
+           infant_mortality="SP.DYN.IMRT.IN")
+}
+
+```
+
+
+
+
+## Import the data
+
+```{r}
+economies <- dir("data_world_bank", pattern = "\\.csv$", full.names = TRUE)
+final <- map_df(economies, wbd)
+
+
+
+```
+
+## Explore the data
+```{r}
+#First we need to know if there are NA before doing covariances and variances 
+is.na(final)
+# There are NA in the data so I will drop NA before doing any calculation and save it as a new data frame
+
+final_NA<- na.omit(final)
+final_NA2<- drop_na(final)
+
+# For calculating the covariance I am using variables that are used in Modern Growth Theory like: 
+# - Fertility rate
+# - GDP per capita 
+# - Infant mortality rate
+# - Life expectancy 
+
+                          
+cov(final_NA$gdp_percapita,final_NA$fertility_rate) # cov: -5419.76 which is consistent with Growth Theory, the larger the gdp the smaller the fertility rate as women enter to the labor force and decide not to have kids. 
+
+cov(final_NA$gdp_percapita, final_NA$life_expectancy)#cov: 18868.98 also consistent with the theory, as the country becomes richer, the life expectancy starts to increase. 
+
+cov(final_NA$gdp_percapita, final_NA$infant_mortality)# cov: -87491.4 as the country becomes richer, infant mortality declines. 
+
+#Variance 
+var(final_NA$gdp_percapita)
+var(final_NA$fertility_rate)
+var(final_NA$life_expectancy)
+var(final_NA$infant_mortality)
+
+#None of the variances are cero which is good because in order to make any statistical analysis we need the variables to vary. 
+
+# Finally I am going to do some plot in order to have a visualization of the behavior of the variables 
+final%>%
+  ggplot(aes(x=log(gdp_percapita), y=fertility_rate))+geom_line(color= "pink", size=1)+labs(title = "GDP and fertility rate", x= "gdp per capita ", y="fertility rate")
+
+final%>%
+  ggplot(aes(x=year, y=gdp_percapita))+geom_line(color= "green", size=1)+labs(title = "GDP growth", x= "year", y="GDP per capita")
+
+final%>%
+  ggplot(aes(x=log(gdp_percapita), y=life_expectancy))+geom_line(color= "purple", size=1)+labs(title = "GDP and life expectancy", x= "GDP per capita", y="Life expectancy")
+
+final%>%
+  ggplot(aes(x=infant_mortality, y=fertility_rate))+geom_line(color= "pink", size=1)+labs(title = "Relationship between infant mortality and fertility rate", x= "infant mortality", y="fertility rate")
+
+
+```
+The growth theory says that as GDP per capita growth, fertility rates declines the graph made with data from Mexico is consistent with the theory. 
+
+On the other graph we can observe the gdp growth rate of Mexico from 1960 to 2020, as observed there were two  mayor econoic crisis one in the 80's and one in mid 90's. 
+
+Life expectancy graph versus gdp also is consistent with growth theory, richer countries tend to have better health, therefore, an increase in life expectancy. 
+
+Lastly growth theory states that in the past as infant mortality was higher,  families tend to had more kids as they internalized that they would lose some of them. And as infant mortality started to decline, also fertility rate declined. We can observe that data from Mexico is consistent with the theory as there is a positive relationship between these two variables. 
+
+
+
+## Session info
+
+```{r}
+devtools::session_info()
+```
+?map
+
+getwd
